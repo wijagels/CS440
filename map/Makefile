@@ -4,11 +4,14 @@ HEADEREXT = hpp
 LDFLAGS=
 BIN_DIR = ./bin
 OBJ_DIR = ./obj
+INCLUDE_DIR = ./include
 TEST_DIR = ./tests
+DEP_DIR = ./dep
 TESTS := $(wildcard $(TEST_DIR)/*.$(SRCEXT))
 TEST_OBJECTS := $(TESTS:$(TEST_DIR)/%.$(SRCEXT)=$(OBJ_DIR)/%.o)
 TEST_BINS := $(TEST_OBJECTS:$(OBJ_DIR)/%.o=$(BIN_DIR)/%.out)
-HEADERS := $(shell find . -type f -name "*.$(HEADEREXT)")
+HEADERS := $(wildcard $(INCLUDE_DIR)/*.$(HEADEREXT))
+DEPS := $(TESTS:$(TEST_DIR)/%.$(SRCEXT)=$(DEP_DIR)/%.d)
 
 ccred:=$(shell echo "\033[0;31m")
 ccgreen:=$(shell echo "\033[0;92m")
@@ -16,11 +19,8 @@ ccyellow:=$(shell echo "\033[0;33m")
 ccend:=$(shell echo "\033[0m")
 
 
-all: compile link
+all: $(DEPS) $(TEST_OBJECTS) $(TEST_BINS)
 
-compile: $(TEST_OBJECTS)
-
-link: $(TEST_BINS)
 
 $(BIN_DIR)/%.out : $(OBJ_DIR)/%.o
 	@echo Building $@
@@ -29,6 +29,11 @@ $(BIN_DIR)/%.out : $(OBJ_DIR)/%.o
 $(OBJ_DIR)/%.o : $(TEST_DIR)/%.$(SRCEXT)
 	@echo Compiling $@
 	@$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(DEP_DIR)/%.d : $(TEST_DIR)/%.$(SRCEXT)
+	$(CXX) $(CXXFLAGS) -MM -MP -MF $@ $<
+
+-include $(DEPS)
 
 clean:
 	-rm -f $(TEST_OBJECTS) $(TEST_BINS)
@@ -43,8 +48,10 @@ lint: $(SOURCES) $(HEADERS)
 	cpplint $^
 
 print:
+	@echo $(HEADERS)
 	@echo $(TESTS)
 	@echo $(TEST_OBJECTS)
 	@echo $(TEST_BINS)
+	@echo $(DEPS)
 
 .PHONY: clean

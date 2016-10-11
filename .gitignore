@@ -8,6 +8,9 @@
 *.gch
 *.pch
 
+# Dependency lists
+*.d
+
 # Libraries
 *.lib
 *.a
@@ -32,8 +35,11 @@
 # Debug files
 *.dSYM/
 
-# Core dumps
+# Core dumps/rundata
 core
+vgcore.*
+perf.data
+perf.data.old
 
 # Lab executables
 lab[0-9]*
