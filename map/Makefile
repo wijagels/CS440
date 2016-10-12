@@ -1,4 +1,4 @@
-CXXFLAGS := -g -Wall -Wextra -pedantic -O3 -std=c++11 -I./include
+CXXFLAGS := -g -Wall -Wextra -pedantic -std=c++11 -I./include
 SRCEXT = cpp
 HEADEREXT = hpp
 LDFLAGS=
@@ -13,10 +13,10 @@ TEST_BINS := $(TEST_OBJECTS:$(OBJ_DIR)/%.o=$(BIN_DIR)/%.out)
 HEADERS := $(wildcard $(INCLUDE_DIR)/*.$(HEADEREXT))
 DEPS := $(TESTS:$(TEST_DIR)/%.$(SRCEXT)=$(DEP_DIR)/%.d)
 
-ccred:=$(shell echo "\033[0;31m")
-ccgreen:=$(shell echo "\033[0;92m")
-ccyellow:=$(shell echo "\033[0;33m")
-ccend:=$(shell echo "\033[0m")
+ccred:=$(shell echo -e "\033[0;31m")
+ccgreen:=$(shell echo -e "\033[0;92m")
+ccyellow:=$(shell echo -e "\033[0;33m")
+ccend:=$(shell echo -e "\033[0m")
 
 
 all: $(DEPS) $(TEST_OBJECTS) $(TEST_BINS)
@@ -38,14 +38,11 @@ $(DEP_DIR)/%.d : $(TEST_DIR)/%.$(SRCEXT)
 clean:
 	-rm -f $(TEST_OBJECTS) $(TEST_BINS)
 
-valgrind: all
-	$(RUNV)
-
-bench: all
-	$(RUNS)
-
 lint: $(SOURCES) $(HEADERS)
 	cpplint $^
+
+test-sl: ./bin/test-skiplist.out
+	valgrind ./bin/test-skiplist.out
 
 print:
 	@echo $(HEADERS)
