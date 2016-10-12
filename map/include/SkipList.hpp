@@ -2,7 +2,6 @@
 #ifndef MAP_INCLUDE_SKIPLIST_HPP_
 #define MAP_INCLUDE_SKIPLIST_HPP_
 
-#include <algorithm>
 #include <cstdlib>
 #include <list>
 #include <random>
@@ -21,8 +20,8 @@ class SkipList {
 
   SkipList() : nodes{} {
     // Bottom level stored in std::list
+    this->end_iter = nodes.end();
     this->skips = std::vector<it_t>{height - 1, nodes.end()};
-    logd("Ctor");
   }
   SkipList(const SkipList &other);
 
@@ -32,35 +31,37 @@ class SkipList {
         return i;
       }
     }
-    return 32;
+    return height;
   }
 
   std::pair<it_t, bool> insert(const T &data) {
+    logd("Insert %d", data);
     auto skips = this->skips;
     std::stack<it_t> hist;
     std::size_t level = height;
     while (level > 1 && skips.size()) {
       for (std::size_t i = std::min(skips.size(), level); i > 0; i--) {
         it_t ref = skips.at(i - 1);
-        if (ref == nodes.end()) {
+        if (ref == this->end()) {
           level--;
         } else if (ref->data == data) {
           return {ref, false};
         } else if (ref->data < data) {
           skips = ref->skips;
+          hist.push(ref);
           i = std::min(i, skips.size());
           logd("Push %d. i = %zu", ref->data, i);
-          if (i == 0) break;
-          hist.push(ref);
+          if (i == 0) break;  // Prevent underflow
         } else {
           level--;
         }
       }
     }
+
     if (hist.empty()) {
       // Did not move at all.
       logd("%s", "No express lane :(");
-      for (auto it = nodes.begin(); it != nodes.end(); it++) {
+      for (auto it = nodes.begin(); it != this->end(); it++) {
         if (data < it->data) {
           auto inserted = nodes.emplace(it, data);
           std::pair<it_t, bool> ret{inserted, true};
@@ -69,7 +70,7 @@ class SkipList {
           if (h == 1) {
             return ret;
           }
-          inserted->skips.resize(h - 1, nodes.end());
+          inserted->skips.resize(h - 1, this->end());
           for (size_t i = 0; i < h - 1; i++) {
             auto old = this->skips.at(i);
             logd("Relinking NIL -> %d -> %d", inserted->data, old->data);
@@ -80,53 +81,56 @@ class SkipList {
         }
       }
       nodes.emplace_back(data);
-      auto inserted = --nodes.end();
+      it_t inserted = this->end();
+      inserted--;
       std::pair<it_t, bool> ret{inserted, true};
       size_t h = pick_height();
       logd("Picked %zu", h);
       if (h == 1) {
         return ret;
       }
-      inserted->skips.resize(h - 1, nodes.end());
+      inserted->skips.resize(h - 1, this->end());
       for (size_t i = 0; i < h - 1; i++) {
         auto old = this->skips.at(i);
         this->skips.at(i) = inserted;
         inserted->skips.at(i) = old;
       }
       return ret;
-    } else {
-      // Final run
-      it_t inserted = nodes.end();
-      for (auto it = hist.top(); it != nodes.end(); it++) {
-        if (data < it->data) {
-          inserted = nodes.emplace(it, data);
-        }
-      }
-      if (inserted == nodes.end()) {
-        nodes.emplace_back(data);
-        inserted = --nodes.end();
-      }
-      std::pair<it_t, bool> ret{inserted, true};
-      size_t h = pick_height();
-      logd("Picked %zu", h);
-      if (h == 1) {
-        // Easy, link already made.
-        return ret;
-      }
-      inserted->skips.resize(h - 1, nodes.end());
-      size_t linked = 1;
-      while (!hist.empty()) {
-        auto n = hist.top();
-        hist.pop();
-        for (size_t i = linked - 1; i < h && i < n->skips.size(); i++) {
-          logd("Relinking %d -> %d -> %d", n->data, inserted->data,
-               n->skips.at(i)->data);
-          n->skips.at(i) = inserted;
-        }
-        return ret;
+    }
+    // Final run
+    it_t inserted = this->end();
+    for (auto it = hist.top(); it != this->end(); it++) {
+      if (data < it->data) {
+        inserted = nodes.emplace(it, data);
       }
     }
-    // TODO
+    if (inserted == this->end()) {
+      nodes.emplace_back(data);
+      inserted = this->end();
+      inserted--;
+    }
+    std::pair<it_t, bool> ret{inserted, true};
+    size_t h = pick_height();
+    logd("Picked %zu", h);
+    if (h == 1) {
+      // Easy, link already made.
+      return ret;
+    }
+    inserted->skips.resize(h - 1, this->end());
+    size_t linked = 1;
+    while (!hist.empty()) {
+      auto n = hist.top();
+      hist.pop();
+      logd("At %d, Link candidates h = %zu, linked = %zu", n->data, h, linked);
+      for (size_t i = linked - 1; i < h - 1 && i < n->level(); i++) {
+        auto old = n->skips.at(i);
+        logd("Relinking %d -> %d -> %d", n->data, inserted->data, old->data);
+        n->skips.at(i) = inserted;
+        inserted->skips.at(i) = old;
+        linked++;
+      }
+    }
+    return ret;
   }
 
   it_t find(const T &data) {
@@ -159,10 +163,11 @@ class SkipList {
       return nodes.end();
     } else {
       for (auto it = hist.top(); it != nodes.end(); it++) {
+        if (data == it->data) return it;
       }
     }
-    logd("Returning end");
-    return nodes.end();
+    logd("Returning %s", "end");
+    return this->end();
   }
 
   it_t begin(void) { return nodes.begin(); }
@@ -173,15 +178,17 @@ class SkipList {
   r_it_t rend(void) { return nodes.rend(); }
 
   struct Node {
-   public:
     explicit Node(T data) : data{data} {}
-    const T data;
+    T data;
     std::vector<it_t> skips;
+
+    std::size_t level(void) const { return skips.size(); }
   };
 
  public:
   std::list<Node> nodes;
   std::vector<it_t> skips;
+  it_t end_iter;
 };
 }  // namespace cs540
 

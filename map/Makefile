@@ -1,4 +1,4 @@
-CXXFLAGS := -g -Wall -Wextra -pedantic -std=c++11 -I./include
+CXXFLAGS := -g -DNDEBUG -Wall -Wextra -pedantic -std=c++11 -I./include
 SRCEXT = cpp
 HEADEREXT = hpp
 LDFLAGS=
@@ -36,7 +36,7 @@ $(DEP_DIR)/%.d : $(TEST_DIR)/%.$(SRCEXT)
 -include $(DEPS)
 
 clean:
-	-rm -f $(TEST_OBJECTS) $(TEST_BINS)
+	-rm -f $(TEST_OBJECTS) $(TEST_BINS) vgcore.*
 
 lint: $(SOURCES) $(HEADERS)
 	cpplint $^

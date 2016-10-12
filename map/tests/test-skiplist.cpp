@@ -15,7 +15,7 @@ int main() {
   for (auto it : sl) {
     logd("%d", it.data);
     for (auto jt : it.skips) {
-      std::string s;
+      std::string s{};
       if (jt == sl.end())
         s = "NIL";
       else
@@ -24,6 +24,9 @@ int main() {
     }
   }
   std::cout << (*sl.find(6)).data << std::endl;
+  std::cout << (*sl.find(1)).data << std::endl;
+  std::cout << (*sl.find(6)).data << std::endl;
+  std::cout << (*sl.find(17)).data << std::endl;
   sl.begin();
   sl.end();
 }

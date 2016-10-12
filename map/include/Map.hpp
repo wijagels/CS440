@@ -20,19 +20,27 @@ class Map {
   Map();
   Map(const Map &);
   Map &operator=(const Map &);
-  Map(std::initializer_list<std::pair<const Key_T, Mapped_T>>);
+  Map(std::initializer_list<std::pair<const Key_T, Mapped_T>> pairs) {
+    for (auto e : pairs) this->insert(e);
+  }
   ~Map();
+
+  SkipList<ValueType, 32> skiplist;
+
   size_t size() const;
   bool empty() const;
-  Iterator begin();
-  Iterator end();
-  ConstIterator begin() const;
-  ConstIterator end() const;
+  Iterator begin() { return Iterator(this->skiplist.begin()); }
+  Iterator end() { return Iterator(this->skiplist.end()); }
+  ConstIterator begin() const { return ConstIterator(this->skiplist.begin()); }
+  ConstIterator end() const { return ConstIterator(this->skiplist.end()); }
   ReverseIterator rbegin();
   ReverseIterator rend();
   Iterator find(const Key_T &);
   ConstIterator find(const Key_T &) const;
-  Mapped_T &at(const Key_T &);
+  Mapped_T &at(const Key_T &tgt) {
+    auto f = skiplist.find(tgt);
+    return f->data.second;
+  }
   const Mapped_T &at(const Key_T &) const;
   Mapped_T &operator[](const Key_T &);
   std::pair<Iterator, bool> insert(const ValueType &);
@@ -49,27 +57,49 @@ class Map {
 
   struct Iterator {
     Iterator() = delete;
-    Iterator(const Iterator &);
-    Iterator &operator=(const Iterator &);
-    Iterator &operator++();
-    Iterator operator++(int);
-    Iterator &operator--();
-    Iterator operator--(int);
-    ValueType &operator*() const;
-    ValueType *operator->() const;
+    typename SkipList<ValueType, 32>::it_t iter;
+    Iterator(typename SkipList<ValueType, 32>::it_t other) {
+      this->iter = other;
+    }
+    // Iterator(const Iterator &);
+    // Iterator(const super &other) : super{} {}
+    // Iterator &operator=(const Iterator &);
+    Iterator &operator++() {
+      ++this->iter;
+      return *this;
+    }
+    Iterator operator++(int) { return this->iter.operator++(0); }
+    Iterator &operator--() {
+      --this->iter;
+      return *this;
+    }
+    Iterator operator--(int) { return this->iter.operator--(0); }
+    ValueType &operator*() const { return this->iter->data; }
+    // ValueType *operator->() const { return super->operator->(); }
   };
   struct ConstIterator {
     ConstIterator() = delete;
-    ConstIterator(const ConstIterator &);
-    ConstIterator &operator=(const ConstIterator &);
-    ConstIterator &operator++();
-    ConstIterator operator++(int);
-    ConstIterator &operator--();
-    ConstIterator operator--(int);
-    ValueType &operator*() const;
-    ValueType *operator->() const;
+    typename SkipList<ValueType, 32>::const_it_t iter;
+    ConstIterator(typename SkipList<ValueType, 32>::const_it_t other) {
+      this->iter = other;
+    }
+    // ConstIterator(const ConstIterator &);
+    // ConstIterator(const Iterator &);
+    // ConstIterator &operator=(const ConstIterator &);
+    ConstIterator &operator++() {
+      ++this->iter;
+      return *this;
+    }
+    ConstIterator operator++(int) { return this->iter.operator++(0); }
+    ConstIterator &operator--() {
+      --this->iter;
+      return *this;
+    }
+    ConstIterator operator--(int) { return this->iter.operator--(0); }
+    const ValueType &operator*() const { return this->iter->data; }
+    const ValueType *operator->() const { return this->iter->data; }
   };
-  struct ReverseIterator {
+  struct ReverseIterator : public Iterator {
     ReverseIterator() = delete;
     ReverseIterator(const ReverseIterator &);
     ReverseIterator &operator=(const ReverseIterator &);
