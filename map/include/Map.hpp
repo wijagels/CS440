@@ -25,7 +25,7 @@ class Map {
   }
   ~Map();
 
-  SkipList<ValueType, 32> skiplist;
+  SkipList<Key_T, Mapped_T, 32> skiplist;
 
   size_t size() const;
   bool empty() const;
@@ -39,7 +39,7 @@ class Map {
   ConstIterator find(const Key_T &) const;
   Mapped_T &at(const Key_T &tgt) {
     auto f = skiplist.find(tgt);
-    return f->data.second;
+    return f->data();
   }
   const Mapped_T &at(const Key_T &) const;
   Mapped_T &operator[](const Key_T &);
@@ -57,8 +57,8 @@ class Map {
 
   struct Iterator {
     Iterator() = delete;
-    typename SkipList<ValueType, 32>::it_t iter;
-    Iterator(typename SkipList<ValueType, 32>::it_t other) {
+    typename SkipList<Key_T, Mapped_T, 32>::it_t iter;
+    Iterator(typename SkipList<Key_T, Mapped_T, 32>::it_t other) {
       this->iter = other;
     }
     // Iterator(const Iterator &);
@@ -74,13 +74,13 @@ class Map {
       return *this;
     }
     Iterator operator--(int) { return this->iter.operator--(0); }
-    ValueType &operator*() const { return this->iter->data; }
-    // ValueType *operator->() const { return super->operator->(); }
+    ValueType &operator*() const { return this->iter->pair; }
+    ValueType *operator->() const { return &this->iter->pair; }
   };
   struct ConstIterator {
     ConstIterator() = delete;
-    typename SkipList<ValueType, 32>::const_it_t iter;
-    ConstIterator(typename SkipList<ValueType, 32>::const_it_t other) {
+    typename SkipList<Key_T, Mapped_T, 32>::const_it_t iter;
+    ConstIterator(typename SkipList<Key_T, Mapped_T, 32>::const_it_t other) {
       this->iter = other;
     }
     // ConstIterator(const ConstIterator &);
@@ -96,8 +96,8 @@ class Map {
       return *this;
     }
     ConstIterator operator--(int) { return this->iter.operator--(0); }
-    const ValueType &operator*() const { return this->iter->data; }
-    const ValueType *operator->() const { return this->iter->data; }
+    const ValueType &operator*() const { return this->iter->pair; }
+    const ValueType *operator->() const { return &this->iter->pair; }
   };
   struct ReverseIterator : public Iterator {
     ReverseIterator() = delete;
