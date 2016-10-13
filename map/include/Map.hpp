@@ -3,6 +3,7 @@
 #define MAP_INCLUDE_MAP_HPP_
 
 #include <initializer_list>
+#include <stdexcept>
 #include <utility>
 
 #include "SkipList.hpp"
@@ -17,17 +18,16 @@ class Map {
   struct ConstIterator;
   struct ReverseIterator;
   typedef std::pair<Key_T, Mapped_T> ValueType;
-  Map();
+  Map() : skiplist{} {}
   Map(const Map &);
   Map &operator=(const Map &);
   Map(std::initializer_list<std::pair<const Key_T, Mapped_T>> pairs) {
     for (auto e : pairs) this->insert(e);
   }
-  ~Map();
 
   SkipList<Key_T, Mapped_T, 32> skiplist;
 
-  size_t size() const;
+  size_t size() const { return this->skiplist.size(); }
   bool empty() const;
   Iterator begin() { return Iterator(this->skiplist.begin()); }
   Iterator end() { return Iterator(this->skiplist.end()); }
@@ -35,18 +35,25 @@ class Map {
   ConstIterator end() const { return ConstIterator(this->skiplist.end()); }
   ReverseIterator rbegin();
   ReverseIterator rend();
-  Iterator find(const Key_T &);
+  Iterator find(const Key_T &key) { return this->skiplist.find(key); }
   ConstIterator find(const Key_T &) const;
   Mapped_T &at(const Key_T &tgt) {
     auto f = skiplist.find(tgt);
+    if (f == skiplist.end()) throw std::out_of_range("Key not in map");
     return f->data();
   }
-  const Mapped_T &at(const Key_T &) const;
+  const Mapped_T &at(const Key_T &tgt) const { return this->at(tgt); }
   Mapped_T &operator[](const Key_T &);
-  std::pair<Iterator, bool> insert(const ValueType &);
+  std::pair<Iterator, bool> insert(const ValueType &element) {
+    return this->skiplist.insert(element);
+  }
 
   template <typename IT_T>
-  void insert(IT_T range_beg, IT_T range_end);
+  void insert(IT_T range_beg, IT_T range_end) {
+    for (auto it = range_beg; it != range_end; it++) {
+      this->insert(*it);
+    }
+  }
 
   void erase(Iterator pos);
   void erase(const Key_T &);
@@ -61,9 +68,6 @@ class Map {
     Iterator(typename SkipList<Key_T, Mapped_T, 32>::it_t other) {
       this->iter = other;
     }
-    // Iterator(const Iterator &);
-    // Iterator(const super &other) : super{} {}
-    // Iterator &operator=(const Iterator &);
     Iterator &operator++() {
       ++this->iter;
       return *this;
@@ -83,9 +87,8 @@ class Map {
     ConstIterator(typename SkipList<Key_T, Mapped_T, 32>::const_it_t other) {
       this->iter = other;
     }
-    // ConstIterator(const ConstIterator &);
-    // ConstIterator(const Iterator &);
-    // ConstIterator &operator=(const ConstIterator &);
+    ConstIterator(const ConstIterator &other) : iter{other.iter} {}
+    ConstIterator(const Iterator &other) : iter{other.iter} {}
     ConstIterator &operator++() {
       ++this->iter;
       return *this;
@@ -99,7 +102,7 @@ class Map {
     const ValueType &operator*() const { return this->iter->pair; }
     const ValueType *operator->() const { return &this->iter->pair; }
   };
-  struct ReverseIterator : public Iterator {
+  struct ReverseIterator {
     ReverseIterator() = delete;
     ReverseIterator(const ReverseIterator &);
     ReverseIterator &operator=(const ReverseIterator &);

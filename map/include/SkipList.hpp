@@ -37,6 +37,8 @@ class SkipList {
     return height;
   }
 
+  size_t size() const { return this->nodes.size(); }
+
   std::pair<it_t, bool> insert(const ValueType &isert) {
     auto key = isert.first;
     auto skips = this->skips;
