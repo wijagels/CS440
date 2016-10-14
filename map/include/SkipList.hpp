@@ -22,11 +22,12 @@ class SkipList {
   using ValueType = typename std::pair<Key_T, Mapped_T>;
 
   SkipList() : nodes{} {
+    srand(time(NULL));
     // Bottom level stored in std::list
     this->end_iter = nodes.end();
     this->skips = std::vector<it_t>{height - 1, nodes.end()};
   }
-  SkipList(const SkipList &other);
+  // SkipList(const SkipList &other);
 
   std::size_t pick_height(void) const {
     for (std::size_t i = 1; i <= height; i++) {
@@ -41,22 +42,21 @@ class SkipList {
 
   std::pair<it_t, bool> insert(const ValueType &isert) {
     auto key = isert.first;
-    auto skips = this->skips;
+    auto *skips = &this->skips;
     std::stack<it_t> hist;
     std::size_t level = height;
-    while (level > 1 && skips.size()) {
-      for (std::size_t i = std::min(skips.size(), level); i > 0; i--) {
-        it_t ref = skips.at(i - 1);
+    while (level > 1 && skips->size()) {
+      for (std::size_t i = std::min(skips->size(), level); i > 0; i--) {
+        it_t ref = skips->at(i - 1);
         if (ref == this->end()) {
           level--;
         } else if (ref->key() == key) {
           return {ref, false};
         } else if (ref->key() < key) {
-          skips = ref->skips;
+          skips = &ref->skips;
           hist.push(ref);
-          i = std::min(i, skips.size());
           logd("Push %d. i = %zu", ref->key(), i);
-          if (i == 0) break;  // Prevent underflow
+          break;
         } else {
           level--;
         }
@@ -78,7 +78,7 @@ class SkipList {
           inserted->skips.resize(h - 1, this->end());
           for (size_t i = 0; i < h - 1; i++) {
             auto old = this->skips.at(i);
-            logd("Relinking NIL -> %d -> %d", inserted->key, old->key);
+            logd("Relinking NIL -> %d -> %d", inserted->key(), old->key());
             this->skips.at(i) = inserted;
             inserted->skips.at(i) = old;
           }
@@ -107,6 +107,7 @@ class SkipList {
     for (auto it = hist.top(); it != this->end(); it++) {
       if (key < it->key()) {
         inserted = nodes.emplace(it, isert);
+        break;
       }
     }
     if (inserted == this->end()) {
@@ -123,38 +124,46 @@ class SkipList {
     }
     inserted->skips.resize(h - 1, this->end());
     size_t linked = 1;
-    while (!hist.empty()) {
+    while (!hist.empty() && linked < h) {
       auto n = hist.top();
       hist.pop();
-      logd("At %d, Link candidates h = %zu, linked = %zu", n->key, h, linked);
+      logd("At %d, Link candidates h = %zu, linked = %zu", n->key(), h, linked);
       for (size_t i = linked - 1; i < h - 1 && i < n->level(); i++) {
         auto old = n->skips.at(i);
-        logd("Relinking %d -> %d -> %d", n->key, inserted->key, old->key);
+        logd("Relinking %d -> %d -> %d", n->key(), inserted->key(), old->key());
         n->skips.at(i) = inserted;
         inserted->skips.at(i) = old;
         linked++;
+      }
+    }
+    if (linked < h) {
+      while (linked < h) {
+        auto old = this->skips.at(linked - 1);
+        this->skips.at(linked - 1) = inserted;
+        inserted->skips.at(linked - 1) = old;
+        logd("Relinking NIL -> %d -> %d", inserted->key(), old->key());
+        ++linked;
       }
     }
     return ret;
   }
 
   it_t find(const Key_T &key) {
-    auto skips = this->skips;
+    auto *skips = &this->skips;
     std::stack<it_t> hist;
     std::size_t level = height;
-    while (level > 1) {
-      for (auto i = std::min(skips.size(), level); i > 0; i--) {
-        it_t ref = skips.at(i - 1);
+    while (level > 1 && skips->size()) {
+      for (auto i = std::min(skips->size(), level); i > 0; i--) {
+        it_t ref = skips->at(i - 1);
         if (ref == nodes.end()) {
           level--;
         } else if (ref->key() == key) {
           return ref;
         } else if (ref->key() < key) {
-          skips = ref->skips;
-          i = std::min(i, skips.size());
-          logd("Push %d. i = %zu", ref->key(), i);
-          if (i == 0) break;
+          skips = &ref->skips;
           hist.push(ref);
+          logd("Push %d. i = %zu", ref->key(), i);
+          break;
         } else {
           level--;
         }
@@ -174,6 +183,8 @@ class SkipList {
     logd("Returning %s", "end");
     return this->end();
   }
+
+  void erase(it_t pos) {}
 
   it_t begin(void) { return nodes.begin(); }
   it_t end(void) { return nodes.end(); }
@@ -196,7 +207,6 @@ class SkipList {
     std::vector<it_t> skips;
   };
 
- public:
   std::list<Node> nodes;
   std::vector<it_t> skips;
   it_t end_iter;

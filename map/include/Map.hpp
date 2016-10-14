@@ -19,8 +19,8 @@ class Map {
   struct ReverseIterator;
   typedef std::pair<Key_T, Mapped_T> ValueType;
   Map() : skiplist{} {}
-  Map(const Map &);
-  Map &operator=(const Map &);
+  // Map(const Map &);
+  // Map &operator=(const Map &);
   Map(std::initializer_list<std::pair<const Key_T, Mapped_T>> pairs) {
     for (auto e : pairs) this->insert(e);
   }

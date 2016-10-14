@@ -1,4 +1,4 @@
-CXXFLAGS := -g -DNDEBUG -Wall -Wextra -pedantic -std=c++11 -I./include
+CXXFLAGS := -g -pg -O3 -DNDEBUG -Wall -Wextra -pedantic -std=c++11 -I./include
 SRCEXT = cpp
 HEADEREXT = hpp
 LDFLAGS=
