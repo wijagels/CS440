@@ -17,6 +17,7 @@ template <typename Key_T, typename Mapped_T, size_t height>
 class SkipList {
  public:
   struct Node;
+  struct Sentinel;
   struct Skip;
   using it_t = typename std::list<Node>::iterator;
   using const_it_t = typename std::list<Node>::const_iterator;
@@ -28,9 +29,8 @@ class SkipList {
     // Bottom level stored in std::list
     this->end_iter = nodes.end();
     // this->skips = std::vector<it_t>{height - 1, nodes.end()};
-    nodes.push_front(Node());
-    this->head_ = nodes.begin();
-    this->head_->links =
+    this->head_ = Sentinel{};
+    this->head_.links =
         std::vector<Skip>{height - 1, {nodes.begin(), nodes.end()}};
     // this->links = std::vector<Skip>{height - 1, {nodes.end(), nodes.end()}};
   }
@@ -55,11 +55,18 @@ class SkipList {
     if (old != this->end()) old->links.at(i).first = back;
   }
 
+  void relink(Sentinel &front, it_t &back, int i) {
+    auto old = front.links.at(i).second;
+    front.links.at(i).second = back;
+    back->links.at(i).first = this->end();  // Special case, end is sentinel
+    back->links.at(i).second = old;
+    if (old != this->end()) old->links.at(i).first = back;
+  }
+
   std::pair<it_t, bool> insert(const ValueType &isert) {
     auto key = isert.first;
-    auto links = &this->head_->links;
+    auto links = &this->head_.links;
     std::stack<it_t> hist;
-    hist.push(this->head_);
     size_t level = height;
     while (level > 1 && links->size()) {
       for (size_t i = std::min(links->size(), level); i > 0; i--) {
@@ -81,7 +88,13 @@ class SkipList {
 
     // Final run
     it_t inserted = this->end();
-    for (auto it = hist.top(); it != this->end(); it++) {
+    it_t it;
+    if (hist.empty())
+      it = this->begin();
+    else
+      it = hist.top();
+    for (; it != this->end(); it++) {
+      if (key == it->key()) return {it, false};
       if (key < it->key()) {
         inserted = nodes.emplace(it, isert);
         break;
@@ -102,6 +115,14 @@ class SkipList {
     inserted->links.resize(h - 1, {this->end(), this->end()});
     size_t linked = 1;
     while (linked < h) {
+      if (hist.empty()) {
+        /* Have to update head sentinel */
+        for (size_t i = linked - 1; i < h - 1; i++) {
+          relink(this->head_, inserted, i);
+          linked++;
+        }
+        break;
+      }
       auto n = hist.top();
       hist.pop();
       // logd("At %d, Link candidates h = %zu, linked = %zu", n->key(), h,
@@ -115,9 +136,9 @@ class SkipList {
   }
 
   it_t find(const Key_T &key) {
-    auto links = &this->head_->links;
+    auto links = &this->head_.links;
     std::stack<it_t> hist;
-    hist.push(this->head_);
+    // hist.push(this->head_);
     std::size_t level = height;
     while (level > 1 && links->size()) {
       for (auto i = std::min(links->size(), level); i > 0; i--) {
@@ -136,24 +157,29 @@ class SkipList {
         }
       }
     }
-    for (auto it = hist.top(); it != nodes.end(); it++) {
-      if (key == it->key() && it != this->head_) return it;
+    it_t it;
+    if (hist.empty())
+      it = this->begin();
+    else
+      it = hist.top();
+    for (; it != nodes.end(); it++) {
+      if (key == it->key()) return it;
     }
     logd("Returning %s", "end");
     return this->end();
   }
 
   const_it_t find(const Key_T &key) const {
-    auto links = &this->head_->links;
-    std::stack<it_t> hist;
-    hist.push(this->head_);
+    auto links = &this->head_.links;
+    std::stack<const_it_t> hist;
+    // hist.push(this->head_);
     std::size_t level = height;
     while (level > 1 && links->size()) {
       for (auto i = std::min(links->size(), level); i > 0; i--) {
         it_t ref = links->at(i - 1).second;
         if (ref == nodes.end()) {
           level--;
-        } else if (ref->key() == key && ref != this->head_) {
+        } else if (ref->key() == key) {
           return ref;
         } else if (ref->key() < key) {
           links = &ref->links;
@@ -165,8 +191,13 @@ class SkipList {
         }
       }
     }
-    for (auto it = hist.top(); it != nodes.end(); it++) {
-      if (key == it->key() && it != this->head_) return it;
+    const_it_t it;
+    if (hist.empty())
+      it = this->begin();
+    else
+      it = hist.top();
+    for (; it != nodes.end(); it++) {
+      if (key == it->key()) return it;
     }
     logd("Returning %s", "end");
     return this->end();
@@ -174,7 +205,6 @@ class SkipList {
 
   void erase(it_t &pos) {
     if (pos == this->end()) throw std::out_of_range("Erase failure");
-    if (pos == this->head_) throw std::out_of_range("Erase failure");
     for (size_t i = 0; i < pos->links.size(); i++) {
       if (pos->links.at(i).second == this->end()) {
         logd("Bypassing link from %d -> %d -> %s",
@@ -182,9 +212,12 @@ class SkipList {
       }
       logd("Bypassing link from %d -> %d -> %d", pos->links.at(i).first->key(),
            pos->key(), pos->links.at(i).second->key());
-      auto &front = pos->links.at(i).first;
-      auto &back = pos->links.at(i).second;
-      front->links.at(i).second = back;
+      auto front = pos->links.at(i).first;
+      auto back = pos->links.at(i).second;
+      if (front == this->end())  // Sentinel node
+        this->head_.links.at(i).second = back;
+      else
+        front->links.at(i).second = back;
       if (back != this->end()) back->links.at(i).first = front;
     }
     logd("Erasing %d", pos->key());
@@ -229,7 +262,7 @@ class SkipList {
   };
 
   std::list<Node> nodes;
-  it_t head_;
+  Sentinel head_;
   it_t end_iter;
 };
 }  // namespace cs540

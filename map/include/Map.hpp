@@ -30,8 +30,8 @@ class Map {
   bool empty() const;
   Iterator begin() { return Iterator(this->skiplist.begin()); }
   Iterator end() { return Iterator(this->skiplist.end()); }
-  ConstIterator begin() const { return ConstIterator(this->skiplist.cbegin()); }
-  ConstIterator end() const { return ConstIterator(this->skiplist.cend()); }
+  ConstIterator begin() const { return ConstIterator(this->skiplist.begin()); }
+  ConstIterator end() const { return ConstIterator(this->skiplist.end()); }
   ReverseIterator rbegin() { return ReverseIterator(this->skiplist.rbegin()); }
   ReverseIterator rend() { return ReverseIterator(this->skiplist.rend()); }
   Iterator find(const Key_T &key) { return this->skiplist.find(key); }
@@ -71,9 +71,6 @@ class Map {
     this->erase(pos);
   }
   void clear();
-  bool operator==(const Map &);
-  bool operator!=(const Map &);
-  bool operator<(const Map &);
 
   struct Iterator {
     Iterator() = delete;
@@ -94,10 +91,12 @@ class Map {
     ValueType &operator*() const { return this->iter->pair; }
     ValueType *operator->() const { return &this->iter->pair; }
   };
-  struct ConstIterator {
+  struct ConstIterator : public SkipList<Key_T, Mapped_T, 32>::const_it_t {
     ConstIterator() = delete;
     typename SkipList<Key_T, Mapped_T, 32>::const_it_t iter;
-    ConstIterator(typename SkipList<Key_T, Mapped_T, 32>::const_it_t other) {
+    using value_type = ValueType;
+    ConstIterator(
+        const typename SkipList<Key_T, Mapped_T, 32>::const_it_t &other) {
       this->iter = other;
     }
     ConstIterator(const ConstIterator &other) : iter{other.iter} {}
@@ -117,45 +116,74 @@ class Map {
   };
   struct ReverseIterator {
     ReverseIterator() = delete;
-    ReverseIterator(const ReverseIterator &);
-    ReverseIterator &operator=(const ReverseIterator &);
-    ReverseIterator &operator++();
-    ReverseIterator operator++(int);
-    ReverseIterator &operator--();
-    ReverseIterator operator--(int);
-    ValueType &operator*() const;
-    ValueType *operator->() const;
+    typename SkipList<Key_T, Mapped_T, 32>::r_it_t iter;
+    // ReverseIterator(const ReverseIterator &);
+    // ReverseIterator &operator=(const ReverseIterator &);
+    ReverseIterator(const typename SkipList<Key_T, Mapped_T, 32>::r_it_t &other)
+        : iter{other} {}
+    ReverseIterator &operator++() {
+      ++this->iter;
+      return *this;
+    }
+    ReverseIterator operator++(int) { return this->iter.operator++(0); }
+    ReverseIterator &operator--() {
+      --this->iter;
+      return *this;
+    }
+    ReverseIterator operator--(int) { return this->iter.operator--(0); }
+    ValueType &operator*() const { return this->iter->pair; }
+    ValueType *operator->() const { return &this->iter->pair; }
   };
+
+  /* Forward iterators */
   friend bool operator==(const Iterator &a, const Iterator &b) {
     return a.iter == b.iter;
   }
   friend bool operator==(const ConstIterator &a, const ConstIterator &b) {
     return a.iter == b.iter;
   }
-  // friend bool operator==(const Iterator &, const ConstIterator &) {
-  //   return false;
-  // }
-  // friend bool operator==(const ConstIterator &, const Iterator &) {
-  //   return false;
-  // }
+  friend bool operator==(const Iterator &a, const ConstIterator &b) {
+    return a.iter == b.iter;
+  }
+  friend bool operator==(const ConstIterator &a, const Iterator &b) {
+    return a.iter == b.iter;
+  }
+  /* Inequality */
   friend bool operator!=(const Iterator &a, const Iterator &b) {
     return a.iter != b.iter;
   }
-  // friend bool operator!=(const ConstIterator &, const ConstIterator &) {
-  //   return false;
-  // }
-  // friend bool operator!=(const Iterator &, const ConstIterator &) {
-  //   return false;
-  // }
-  // friend bool operator!=(const ConstIterator &, const Iterator &) {
-  //   return false;
-  // }
-  // friend bool operator==(const ReverseIterator &, const ReverseIterator &) {
-  //   return false;
-  // }
-  // friend bool operator!=(const ReverseIterator &, const ReverseIterator &) {
-  //   return false;
-  // }
-};
+  friend bool operator!=(const ConstIterator &a, const ConstIterator &b) {
+    return a.iter != b.iter;
+  }
+  friend bool operator!=(const Iterator &a, const ConstIterator &b) {
+    return a.iter != b.iter;
+  }
+  friend bool operator!=(const ConstIterator &a, const Iterator &b) {
+    return a.iter != b.iter;
+  }
+
+  /* Reverse iterator */
+  friend bool operator==(const ReverseIterator &a, const ReverseIterator &b) {
+    return a.iter == b.iter;
+  }
+  friend bool operator!=(const ReverseIterator &a, const ReverseIterator &b) {
+    return a.iter != b.iter;
+  }
+};  // class Map
+/* Comparisons */
+template <typename Key_T, typename Mapped_T>
+bool operator==(const Map<Key_T, Mapped_T> &a, const Map<Key_T, Mapped_T> &b) {
+  return std::equal(a.begin(), a.end(), b.begin());
+}
+
+template <typename Key_T, typename Mapped_T>
+bool operator!=(const Map<Key_T, Mapped_T> &a, const Map<Key_T, Mapped_T> &b) {
+  return !(a == b);
+}
+
+template <typename Key_T, typename Mapped_T>
+bool operator<(const Map<Key_T, Mapped_T> &a, const Map<Key_T, Mapped_T> &b) {
+  return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
+}
 }  // namespace cs540
 #endif  // MAP_INCLUDE_MAP_HPP_
