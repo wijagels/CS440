@@ -91,16 +91,17 @@ class Map {
     ValueType &operator*() const { return this->iter->pair; }
     ValueType *operator->() const { return &this->iter->pair; }
   };
+
   struct ConstIterator : public SkipList<Key_T, Mapped_T, 32>::const_it_t {
+    using parent = typename SkipList<Key_T, Mapped_T, 32>::const_it_t;
     ConstIterator() = delete;
     typename SkipList<Key_T, Mapped_T, 32>::const_it_t iter;
     using value_type = ValueType;
     ConstIterator(
-        const typename SkipList<Key_T, Mapped_T, 32>::const_it_t &other) {
-      this->iter = other;
-    }
-    ConstIterator(const ConstIterator &other) : iter{other.iter} {}
-    ConstIterator(const Iterator &other) : iter{other.iter} {}
+        const typename SkipList<Key_T, Mapped_T, 32>::const_it_t &other)
+        : parent{}, iter{other} {}
+    ConstIterator(const ConstIterator &other) : parent{}, iter{other.iter} {}
+    ConstIterator(const Iterator &other) : parent{}, iter{other.iter} {}
     ConstIterator &operator++() {
       ++this->iter;
       return *this;
@@ -114,11 +115,10 @@ class Map {
     const ValueType &operator*() const { return this->iter->pair; }
     const ValueType *operator->() const { return &this->iter->pair; }
   };
+
   struct ReverseIterator {
     ReverseIterator() = delete;
     typename SkipList<Key_T, Mapped_T, 32>::r_it_t iter;
-    // ReverseIterator(const ReverseIterator &);
-    // ReverseIterator &operator=(const ReverseIterator &);
     ReverseIterator(const typename SkipList<Key_T, Mapped_T, 32>::r_it_t &other)
         : iter{other} {}
     ReverseIterator &operator++() {
@@ -170,6 +170,7 @@ class Map {
     return a.iter != b.iter;
   }
 };  // class Map
+
 /* Comparisons */
 template <typename Key_T, typename Mapped_T>
 bool operator==(const Map<Key_T, Mapped_T> &a, const Map<Key_T, Mapped_T> &b) {
@@ -185,5 +186,6 @@ template <typename Key_T, typename Mapped_T>
 bool operator<(const Map<Key_T, Mapped_T> &a, const Map<Key_T, Mapped_T> &b) {
   return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
 }
+
 }  // namespace cs540
 #endif  // MAP_INCLUDE_MAP_HPP_
