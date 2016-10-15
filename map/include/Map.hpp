@@ -3,6 +3,7 @@
 #define MAP_INCLUDE_MAP_HPP_
 
 #include <initializer_list>
+#include <iostream>
 #include <stdexcept>
 #include <utility>
 
@@ -19,8 +20,6 @@ class Map {
   struct ReverseIterator;
   typedef std::pair<Key_T, Mapped_T> ValueType;
   Map() : skiplist{} {}
-  // Map(const Map &);
-  // Map &operator=(const Map &);
   Map(std::initializer_list<std::pair<const Key_T, Mapped_T>> pairs) {
     for (auto e : pairs) this->insert(e);
   }
@@ -31,10 +30,10 @@ class Map {
   bool empty() const;
   Iterator begin() { return Iterator(this->skiplist.begin()); }
   Iterator end() { return Iterator(this->skiplist.end()); }
-  ConstIterator begin() const { return ConstIterator(this->skiplist.begin()); }
-  ConstIterator end() const { return ConstIterator(this->skiplist.end()); }
-  ReverseIterator rbegin();
-  ReverseIterator rend();
+  ConstIterator begin() const { return ConstIterator(this->skiplist.cbegin()); }
+  ConstIterator end() const { return ConstIterator(this->skiplist.cend()); }
+  ReverseIterator rbegin() { return ReverseIterator(this->skiplist.rbegin()); }
+  ReverseIterator rend() { return ReverseIterator(this->skiplist.rend()); }
   Iterator find(const Key_T &key) { return this->skiplist.find(key); }
   ConstIterator find(const Key_T &) const;
   Mapped_T &at(const Key_T &tgt) {
@@ -42,8 +41,18 @@ class Map {
     if (f == skiplist.end()) throw std::out_of_range("Key not in map");
     return f->data();
   }
-  const Mapped_T &at(const Key_T &tgt) const { return this->at(tgt); }
-  Mapped_T &operator[](const Key_T &);
+  const Mapped_T &at(const Key_T &tgt) const {
+    auto f = this->skiplist.find(tgt);
+    if (f == skiplist.end()) throw std::out_of_range("Key not in map");
+    return f->data();
+  }
+  Mapped_T &operator[](const Key_T &key) {
+    auto r = this->skiplist.find(key);
+    if (r != this->skiplist.end()) return r->data();
+    ValueType el{key, Mapped_T{}};
+    auto iter = this->skiplist.insert(el).first;
+    return iter->data();
+  }
   std::pair<Iterator, bool> insert(const ValueType &element) {
     return this->skiplist.insert(element);
   }
@@ -55,8 +64,12 @@ class Map {
     }
   }
 
-  void erase(Iterator pos);
-  void erase(const Key_T &);
+  void erase(Iterator pos) { this->skiplist.erase(pos.iter); }
+  void erase(const Key_T &k) {
+    auto pos = this->skiplist.find(k);
+    if (pos == this->skiplist.end()) throw std::out_of_range("Key not in map");
+    this->erase(pos);
+  }
   void clear();
   bool operator==(const Map &);
   bool operator!=(const Map &);
@@ -65,7 +78,7 @@ class Map {
   struct Iterator {
     Iterator() = delete;
     typename SkipList<Key_T, Mapped_T, 32>::it_t iter;
-    Iterator(typename SkipList<Key_T, Mapped_T, 32>::it_t other) {
+    Iterator(const typename SkipList<Key_T, Mapped_T, 32>::it_t &other) {
       this->iter = other;
     }
     Iterator &operator++() {
@@ -113,32 +126,36 @@ class Map {
     ValueType &operator*() const;
     ValueType *operator->() const;
   };
-  friend bool operator==(const Iterator &, const Iterator &) { return false; }
-  friend bool operator==(const ConstIterator &, const ConstIterator &) {
-    return false;
+  friend bool operator==(const Iterator &a, const Iterator &b) {
+    return a.iter == b.iter;
   }
-  friend bool operator==(const Iterator &, const ConstIterator &) {
-    return false;
+  friend bool operator==(const ConstIterator &a, const ConstIterator &b) {
+    return a.iter == b.iter;
   }
-  friend bool operator==(const ConstIterator &, const Iterator &) {
-    return false;
+  // friend bool operator==(const Iterator &, const ConstIterator &) {
+  //   return false;
+  // }
+  // friend bool operator==(const ConstIterator &, const Iterator &) {
+  //   return false;
+  // }
+  friend bool operator!=(const Iterator &a, const Iterator &b) {
+    return a.iter != b.iter;
   }
-  friend bool operator!=(const Iterator &, const Iterator &) { return false; }
-  friend bool operator!=(const ConstIterator &, const ConstIterator &) {
-    return false;
-  }
-  friend bool operator!=(const Iterator &, const ConstIterator &) {
-    return false;
-  }
-  friend bool operator!=(const ConstIterator &, const Iterator &) {
-    return false;
-  }
-  friend bool operator==(const ReverseIterator &, const ReverseIterator &) {
-    return false;
-  }
-  friend bool operator!=(const ReverseIterator &, const ReverseIterator &) {
-    return false;
-  }
+  // friend bool operator!=(const ConstIterator &, const ConstIterator &) {
+  //   return false;
+  // }
+  // friend bool operator!=(const Iterator &, const ConstIterator &) {
+  //   return false;
+  // }
+  // friend bool operator!=(const ConstIterator &, const Iterator &) {
+  //   return false;
+  // }
+  // friend bool operator==(const ReverseIterator &, const ReverseIterator &) {
+  //   return false;
+  // }
+  // friend bool operator!=(const ReverseIterator &, const ReverseIterator &) {
+  //   return false;
+  // }
 };
 }  // namespace cs540
 #endif  // MAP_INCLUDE_MAP_HPP_

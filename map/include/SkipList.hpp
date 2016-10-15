@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <list>
+#include <memory>
 #include <random>
 #include <stack>
 #include <utility>
@@ -12,10 +13,11 @@
 #include "./debug.h"
 
 namespace cs540 {
-template <typename Key_T, typename Mapped_T, std::size_t height>
+template <typename Key_T, typename Mapped_T, size_t height>
 class SkipList {
  public:
   struct Node;
+  struct Skip;
   using it_t = typename std::list<Node>::iterator;
   using const_it_t = typename std::list<Node>::const_iterator;
   using r_it_t = typename std::list<Node>::reverse_iterator;
@@ -25,12 +27,17 @@ class SkipList {
     srand(time(NULL));
     // Bottom level stored in std::list
     this->end_iter = nodes.end();
-    this->skips = std::vector<it_t>{height - 1, nodes.end()};
+    // this->skips = std::vector<it_t>{height - 1, nodes.end()};
+    nodes.push_front(Node());
+    this->head_ = nodes.begin();
+    this->head_->links =
+        std::vector<Skip>{height - 1, {nodes.begin(), nodes.end()}};
+    // this->links = std::vector<Skip>{height - 1, {nodes.end(), nodes.end()}};
   }
   // SkipList(const SkipList &other);
 
-  std::size_t pick_height(void) const {
-    for (std::size_t i = 1; i <= height; i++) {
+  size_t pick_height(void) const {
+    for (size_t i = 1; i <= height; i++) {
       if (!(rand() % 2)) {
         return i;
       }
@@ -40,22 +47,31 @@ class SkipList {
 
   size_t size() const { return this->nodes.size(); }
 
+  void relink(it_t &front, it_t &back, int i) {
+    auto old = front->links.at(i).second;
+    front->links.at(i).second = back;
+    back->links.at(i).first = front;
+    back->links.at(i).second = old;
+    if (old != this->end()) old->links.at(i).first = back;
+  }
+
   std::pair<it_t, bool> insert(const ValueType &isert) {
     auto key = isert.first;
-    auto *skips = &this->skips;
+    auto links = &this->head_->links;
     std::stack<it_t> hist;
-    std::size_t level = height;
-    while (level > 1 && skips->size()) {
-      for (std::size_t i = std::min(skips->size(), level); i > 0; i--) {
-        it_t ref = skips->at(i - 1);
+    hist.push(this->head_);
+    size_t level = height;
+    while (level > 1 && links->size()) {
+      for (size_t i = std::min(links->size(), level); i > 0; i--) {
+        it_t ref = links->at(i - 1).second;
         if (ref == this->end()) {
           level--;
         } else if (ref->key() == key) {
           return {ref, false};
         } else if (ref->key() < key) {
-          skips = &ref->skips;
+          links = &ref->links;
           hist.push(ref);
-          logd("Push %d. i = %zu", ref->key(), i);
+          // logd("Push %d. i = %zu", ref->key(), i);
           break;
         } else {
           level--;
@@ -63,45 +79,6 @@ class SkipList {
       }
     }
 
-    if (hist.empty()) {
-      // Did not move at all.
-      logd("%s", "No express lane :(");
-      for (auto it = nodes.begin(); it != this->end(); it++) {
-        if (key < it->key()) {
-          auto inserted = nodes.emplace(it, isert);
-          std::pair<it_t, bool> ret{inserted, true};
-          size_t h = pick_height();
-          logd("Picked %zu", h);
-          if (h == 1) {
-            return ret;
-          }
-          inserted->skips.resize(h - 1, this->end());
-          for (size_t i = 0; i < h - 1; i++) {
-            auto old = this->skips.at(i);
-            logd("Relinking NIL -> %d -> %d", inserted->key(), old->key());
-            this->skips.at(i) = inserted;
-            inserted->skips.at(i) = old;
-          }
-          return ret;
-        }
-      }
-      nodes.emplace_back(isert);
-      it_t inserted = this->end();
-      inserted--;
-      std::pair<it_t, bool> ret{inserted, true};
-      size_t h = pick_height();
-      logd("Picked %zu", h);
-      if (h == 1) {
-        return ret;
-      }
-      inserted->skips.resize(h - 1, this->end());
-      for (size_t i = 0; i < h - 1; i++) {
-        auto old = this->skips.at(i);
-        this->skips.at(i) = inserted;
-        inserted->skips.at(i) = old;
-      }
-      return ret;
-    }
     // Final run
     it_t inserted = this->end();
     for (auto it = hist.top(); it != this->end(); it++) {
@@ -117,74 +94,102 @@ class SkipList {
     }
     std::pair<it_t, bool> ret{inserted, true};
     size_t h = pick_height();
-    logd("Picked %zu", h);
+    // logd("Picked %zu", h);
     if (h == 1) {
       // Easy, link already made.
       return ret;
     }
-    inserted->skips.resize(h - 1, this->end());
+    inserted->links.resize(h - 1, {this->end(), this->end()});
     size_t linked = 1;
-    while (!hist.empty() && linked < h) {
+    while (linked < h) {
       auto n = hist.top();
       hist.pop();
-      logd("At %d, Link candidates h = %zu, linked = %zu", n->key(), h, linked);
+      // logd("At %d, Link candidates h = %zu, linked = %zu", n->key(), h,
+      // linked);
       for (size_t i = linked - 1; i < h - 1 && i < n->level(); i++) {
-        auto old = n->skips.at(i);
-        logd("Relinking %d -> %d -> %d", n->key(), inserted->key(), old->key());
-        n->skips.at(i) = inserted;
-        inserted->skips.at(i) = old;
+        relink(n, inserted, i);
         linked++;
-      }
-    }
-    if (linked < h) {
-      while (linked < h) {
-        auto old = this->skips.at(linked - 1);
-        this->skips.at(linked - 1) = inserted;
-        inserted->skips.at(linked - 1) = old;
-        logd("Relinking NIL -> %d -> %d", inserted->key(), old->key());
-        ++linked;
       }
     }
     return ret;
   }
 
   it_t find(const Key_T &key) {
-    auto *skips = &this->skips;
+    auto links = &this->head_->links;
     std::stack<it_t> hist;
+    hist.push(this->head_);
     std::size_t level = height;
-    while (level > 1 && skips->size()) {
-      for (auto i = std::min(skips->size(), level); i > 0; i--) {
-        it_t ref = skips->at(i - 1);
+    while (level > 1 && links->size()) {
+      for (auto i = std::min(links->size(), level); i > 0; i--) {
+        it_t ref = links->at(i - 1).second;
         if (ref == nodes.end()) {
           level--;
         } else if (ref->key() == key) {
           return ref;
         } else if (ref->key() < key) {
-          skips = &ref->skips;
+          links = &ref->links;
           hist.push(ref);
-          logd("Push %d. i = %zu", ref->key(), i);
+          // logd("Push %d. i = %zu", ref->key(), i);
           break;
         } else {
           level--;
         }
       }
     }
-    if (hist.empty()) {
-      // Did not move at all.
-      logd("%s", "No express lane :(");
-      for (auto it = nodes.begin(); it != nodes.end(); it++)
-        if (key == it->key()) return it;
-      return nodes.end();
-    } else {
-      for (auto it = hist.top(); it != nodes.end(); it++) {
-        if (key == it->key()) return it;
-      }
+    for (auto it = hist.top(); it != nodes.end(); it++) {
+      if (key == it->key() && it != this->head_) return it;
     }
     logd("Returning %s", "end");
     return this->end();
   }
 
-  void erase(it_t pos) {}
+  const_it_t find(const Key_T &key) const {
+    auto links = &this->head_->links;
+    std::stack<it_t> hist;
+    hist.push(this->head_);
+    std::size_t level = height;
+    while (level > 1 && links->size()) {
+      for (auto i = std::min(links->size(), level); i > 0; i--) {
+        it_t ref = links->at(i - 1).second;
+        if (ref == nodes.end()) {
+          level--;
+        } else if (ref->key() == key && ref != this->head_) {
+          return ref;
+        } else if (ref->key() < key) {
+          links = &ref->links;
+          hist.push(ref);
+          // logd("Push %d. i = %zu", ref->key(), i);
+          break;
+        } else {
+          level--;
+        }
+      }
+    }
+    for (auto it = hist.top(); it != nodes.end(); it++) {
+      if (key == it->key() && it != this->head_) return it;
+    }
+    logd("Returning %s", "end");
+    return this->end();
+  }
+
+  void erase(it_t &pos) {
+    if (pos == this->end()) throw std::out_of_range("Erase failure");
+    if (pos == this->head_) throw std::out_of_range("Erase failure");
+    for (size_t i = 0; i < pos->links.size(); i++) {
+      if (pos->links.at(i).second == this->end()) {
+        logd("Bypassing link from %d -> %d -> %s",
+             pos->links.at(i).first->key(), pos->key(), "NIL");
+      }
+      logd("Bypassing link from %d -> %d -> %d", pos->links.at(i).first->key(),
+           pos->key(), pos->links.at(i).second->key());
+      auto &front = pos->links.at(i).first;
+      auto &back = pos->links.at(i).second;
+      front->links.at(i).second = back;
+      if (back != this->end()) back->links.at(i).first = front;
+    }
+    logd("Erasing %d", pos->key());
+    this->nodes.erase(pos);
+  }
 
   it_t begin(void) { return nodes.begin(); }
   it_t end(void) { return nodes.end(); }
@@ -193,22 +198,38 @@ class SkipList {
   r_it_t rbegin(void) { return nodes.rbegin(); }
   r_it_t rend(void) { return nodes.rend(); }
 
-  struct Node {
-    Node(Key_T key, Mapped_T data) : pair{key, data} {}
-    Node(ValueType v) : pair{v} {}
+  struct Sentinel {
+    Sentinel() : links{} {}
+    Sentinel(const Node &n) : links{n.links} {}
 
-    std::size_t level(void) const { return skips.size(); }
-    Key_T key(void) const { return pair.first; }
+    size_t level(void) const { return links.size(); }
+
+    std::vector<Skip> links;
+  };
+
+  struct Node : Sentinel {
+    Node() : Sentinel() {}
+    Node(Key_T key, Mapped_T data) : Sentinel(), pair{key, data} {}
+    Node(ValueType v) : Sentinel(), pair{v} {}
+
+    // size_t level(void) const { return links.size(); }
+    const Key_T &key(void) const { return pair.first; }
     Key_T &key(void) { return pair.first; }
-    Mapped_T data(void) const { return pair.second; }
+    const Mapped_T &data(void) const { return pair.second; }
     Mapped_T &data(void) { return pair.second; }
 
     ValueType pair;
-    std::vector<it_t> skips;
+  };
+
+  struct Skip {
+    Skip(const it_t &first, const it_t &second)
+        : first{first}, second{second} {}
+    it_t first;
+    it_t second;
   };
 
   std::list<Node> nodes;
-  std::vector<it_t> skips;
+  it_t head_;
   it_t end_iter;
 };
 }  // namespace cs540
