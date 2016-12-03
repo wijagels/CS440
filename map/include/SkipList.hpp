@@ -26,15 +26,10 @@ class SkipList {
 
   SkipList() : nodes{} {
     srand(time(NULL));
-    // Bottom level stored in std::list
-    this->end_iter = nodes.end();
-    // this->skips = std::vector<it_t>{height - 1, nodes.end()};
     this->head_ = Sentinel{};
     this->head_.links =
         std::vector<Skip>{height - 1, {nodes.begin(), nodes.end()}};
-    // this->links = std::vector<Skip>{height - 1, {nodes.end(), nodes.end()}};
   }
-  // SkipList(const SkipList &other);
 
   size_t pick_height(void) const {
     for (size_t i = 1; i <= height; i++) {
@@ -263,7 +258,6 @@ class SkipList {
 
   std::list<Node> nodes;
   Sentinel head_;
-  it_t end_iter;
 };
 }  // namespace cs540
 

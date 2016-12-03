@@ -2,7 +2,7 @@
 #define _DBG_H
 #include <stdio.h>
 
-#ifdef NDEBUGPRINT
+#ifndef DEBUGPRINT
 #define logd(message, ...)
 #else
 #define logd(message, ...)                                              \
