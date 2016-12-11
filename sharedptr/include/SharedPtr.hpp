@@ -54,11 +54,8 @@ class SharedPtr {
   template <typename U>
   explicit SharedPtr(U *ptr) : ptr_{new RefDerived<U>{ptr}}, bare_ptr_{ptr} {}
 
-  //   template <typename U>
-  //   explicit SharedPtr(U *ptr, bool)
-  //       : ptr_{new RefDerived<U>{ptr}}, bare_ptr_{dynamic_cast<T *>(ptr)} {}
-
-  SharedPtr(const SharedPtr &p) : ptr_{p.ptr_}, bare_ptr_{p.bare_ptr_} {
+  explicit SharedPtr(const SharedPtr &p)
+      : ptr_{p.ptr_}, bare_ptr_{p.bare_ptr_} {
     if (ptr_ != nullptr) ptr_->ref();
   }
 
@@ -81,7 +78,7 @@ class SharedPtr {
 
   /* Assignment operators */
   SharedPtr &operator=(const SharedPtr &rhs) {
-    if (&rhs == this) return *this;
+    if (rhs == *this) return *this;
     if (ptr_ != nullptr) ptr_->unref();
     ptr_ = rhs.ptr_;
     bare_ptr_ = rhs.bare_ptr_;
@@ -91,7 +88,7 @@ class SharedPtr {
 
   template <typename U>
   SharedPtr<T> &operator=(const SharedPtr<U> &rhs) {
-    if ((SharedPtr<T> *)(&rhs) == this) return *this;
+    if (rhs == *this) return *this;
     if (ptr_ != nullptr) ptr_->unref();
     ptr_ = rhs.ptr_;
     if (ptr_ != nullptr) ptr_->ref();
@@ -177,11 +174,11 @@ bool operator!=(std::nullptr_t, const SharedPtr<T> &rhs) {
 
 template <typename T, typename U>
 SharedPtr<T> static_pointer_cast(const SharedPtr<U> &sp) {
-  return SharedPtr<T>(sp, static_cast<T *>(sp.get()));
+  return SharedPtr<T>{sp, static_cast<T *>(sp.get())};
 }
 
 template <typename T, typename U>
 SharedPtr<T> dynamic_pointer_cast(const SharedPtr<U> &sp) {
-  return SharedPtr<T>(sp, dynamic_cast<T *>(sp.get()));
+  return SharedPtr<T>{sp, dynamic_cast<T *>(sp.get())};
 }
 }  // namespace cs540
